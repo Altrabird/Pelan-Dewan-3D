@@ -26,7 +26,7 @@ const app = window.app = {
 };
 
 const ed = window.ed = new Editor2D($('#cv'), app); // window.* for tests/console
-const v3 = new View3D($('#pane3d'));
+const v3 = window.v3 = new View3D($('#pane3d'));
 let t3;
 const schedule3D = () => { clearTimeout(t3); t3 = setTimeout(() => { v3.build(app.plan); fillPovList(); }, 120); };
 
@@ -202,6 +202,7 @@ const ACT = {
     v3.setPov(!v3.pov, +$('#povPath').value); b.classList.toggle('on', v3.pov);
     const p = $('[data-act=play]'); p.classList.toggle('on', v3.playing); p.textContent = v3.playing ? '⏸ Henti aliran' : '▶ Main aliran';
   },
+  crowd(b) { v3.showCrowd = !v3.showCrowd; b.classList.toggle('on', v3.showCrowd); v3.build(app.plan); },
   walls(b) { v3.lowWalls = !v3.lowWalls; b.classList.toggle('on', v3.lowWalls); v3.build(app.plan); },
   frame() { v3.frame(); },
 };

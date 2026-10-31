@@ -25,3 +25,26 @@ Fixed artwork/materials are cached; reusable maps are marked for upload when acc
 - No label decluttering or camera reframing: those would change behaviour. Dense stage/path labels can still overlap in overview, as before.
 - Omitted hanging decorations, roof structure, fabric simulation, high-poly chair stitching, reflections and post-processing to preserve clarity and laptop performance.
 - The worktree already contained staged project files. No staged content was reset or committed. The authored diff is limited to the three permitted source files and this requested handoff.
+
+## Pass 2 — less boxy furniture (31 October 2026)
+
+Authored source changes are limited to js/models.js; this section is the only documentation edit. No people changes: person(color) is byte-for-byte unchanged from the start of this pass, and js/people.js was not edited. Public exports/signatures, stage/steps/ground/zone builders, flag artwork and ceremony backdrop artwork are preserved.
+
+- Banquet chairs: softly rounded white back and cushion, a rounded rectangular cloth skirt with a flared, folded hem, coloured wraparound sash, two bow loops, knot and notched ribbon tails at the rear (+z).
+- Plastic chairs: rounded moulded seat, one curved bevelled back shell with two real through-slots and smoothed normals, and four splayed tubular legs.
+- VIP chairs and sofas: rounded upholstery, separate cushions and softly shaped arms. Tables use open cloth drapes with rounded corners/folds instead of solid boxes; round cloth tops have rolled edges and floor-length skirts.
+- Rounded rostrum, speaker cabinet, door panels/frames and screen surround; retained crest and backdrop. Lathed plant pot with rolled lip; layered low-resolution tree foliage; camera tripod legs now converge on the head with braces and aligned lens.
+- Canopies retain footprint, perimeter posts, 2.5 m eaves and original peak height; roof panels have shallow curvature and the valance is scalloped. Open roofs retain opacity 0.18, depthWrite false and no cast shadow.
+- Shared geometry cache (bounded to 256 entries) covers the new geometry and common box/cylinder/sphere/face primitives. Existing material and procedural texture caches are reused. Only already-vendored RoundedBoxGeometry and mergeVertices imports were added; no new assets or network loads.
+
+Measured in browser from actual BufferGeometry indices/positions (all children are direct plain Mesh objects):
+
+| Style | Meshes | Triangles | World footprint, width × depth |
+| --- | ---: | ---: | --- |
+| banquet | 9 | 574 | 0.456 × 0.478 m |
+| plastic | 6 | 496 | 0.461 × 0.462 m |
+| vip | 9 | 588 | 0.630 × 0.550 m |
+
+Verification: node tests/selftest.mjs passed on final source (730 seats). An earlier full python tests/e2e.py run passed ALL OK, including no console errors, before the final plastic-shell refinement and round-table winding correction. Final close-up browser renders successfully displayed all three chair styles and the furniture/props; visually inspected both. Final E2E rerun passed template/seat checks but hit Playwright's 30-second timeout capturing split.png; a second attempt exceeded the 120-second child-process limit without output. Claude should rerun E2E on final source. Test source was not edited; the requested E2E command regenerated its usual screenshot outputs.
+
+PowerShell exec could not start (helper setup error); edits and checks used Node filesystem access and child_process.execFile. No school-laptop GPU/frame-rate benchmark or prolonged memory soak was performed. No claim of a clean final full E2E run.

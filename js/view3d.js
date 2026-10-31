@@ -1,8 +1,9 @@
 // Three.js view built from the plan. Plan (x, y) → world (x, z); item rot (clockwise, degrees) → rotation.y = -rot.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { chairLayout, elevAt, polySegs, bounds, SURFACES } from './plan.js';
+import { chairLayout, elevAt, polySegs, bounds, SURFACES, toWorld } from './plan.js';
 import * as M from './models.js';
+import * as People from './people.js';
 
 
 // One reusable procedural timber floor; no image requests or per-plank meshes.
@@ -35,7 +36,7 @@ export class View3D {
   constructor(host) {
     this.host = host;
     const r = this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-    r.setPixelRatio(Math.min(2, devicePixelRatio)); r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
+    r.setPixelRatio(Math.min(2, devicePixelRatio)); r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFShadowMap;
     r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.12;
     host.appendChild(r.domElement);
     this.scene = new THREE.Scene(); this.scene.background = new THREE.Color('#e8e5de');
@@ -48,7 +49,7 @@ export class View3D {
     this.scene.add(sun, sun.target);
     const fill = new THREE.DirectionalLight('#e6edff', 0.7); fill.position.set(-12, 16, -10); this.scene.add(fill);
     this.root = new THREE.Group(); this.scene.add(this.root);
-    this.walkers = []; this.playing = false; this.pov = false; this.lowWalls = false;
+    this.walkers = []; this.playing = false; this.pov = false; this.lowWalls = false; this.showCrowd = true;
     this.clock = new THREE.Clock();
     new ResizeObserver(() => this.resize()).observe(host);
     r.setAnimationLoop(() => this.tick());
@@ -89,11 +90,13 @@ export class View3D {
       else { const o = M.build(it, wallH, this.lowWalls, SURFACES); if (o) place(o); }
       const text = it.type === 'chairs' ? `${it.label || 'Kerusi'} (${it.rows * it.cols})` : it.label;
       if (text) {
-        const sp = M.labelSprite(text, it.type === 'label' ? it.color : '#0f172a');
+        const sp = this.label(text, it.type === 'label' ? it.color : '#0f172a');
         sp.position.set(it.x, y + ({ zone: 0.6, label: 0.6, ground: 0.6, canopy: 4.2, tree: 4.5 }[it.type] ?? (it.type === 'stage' ? it.height + 0.4 : 2.3)), it.y);
         this.labels.add(sp);
       }
     }
+    if (People.ready()) { if (this.showCrowd) this.root.add(People.crowd(this.seats(plan))); }
+    else People.load().then(() => this.build(this.plan), e => console.warn('people assets not loaded', e));
     if (!this.framed) { this.frame(); this.framed = true; }
   }
 
@@ -143,12 +146,40 @@ export class View3D {
     const arrows = new THREE.InstancedMesh(arrow, M.mat(it.color, { emissive: it.color, emissiveIntensity: 0.5 }), Math.floor(len / 1.2));
     this.root.add(arrows);
     for (const p of it.pts) if (p.t) {
-      const sp = M.labelSprite(p.t, it.color); sp.scale.multiplyScalar(0.8);
+      const sp = this.label(p.t, it.color, 0.85);
       sp.position.set(p.x, elevAt(this.plan, p.x, p.y) + 2.0, p.y); this.labels.add(sp);
     }
-    const walker = M.person(it.color); this.root.add(walker);
-    this.walkers.push({ curve, len, arrows, walker, u: 0 });
+    const role = /vip|kehormat/i.test(it.label) ? 'vipL' : this.walkers.length % 2 ? 'muridP' : 'muridL';
+    const person = People.ready() ? People.walker(role, this.walkers.length) : { object: M.person(it.color) };
+    this.root.add(person.object);
+    this.walkers.push({ curve, len, arrows, walker: person.object, mixer: person.mixer, u: 0 });
     this.placeArrows(this.walkers.at(-1), 0);
+  }
+
+  // Labels keep a constant on-screen size, so they stay readable from far away and don't swamp close-ups.
+  label(text, color, k = 1) {
+    const sp = M.labelSprite(text, color);
+    if (sp.material.sizeAttenuation) { sp.material.sizeAttenuation = false; sp.material.needsUpdate = true; }
+    sp.scale.multiplyScalar(0.05 * k);
+    return sp;
+  }
+
+  // Every chair and sofa seat gets a person; who sits there follows the block label (murid, guru, VIP, ibu bapa...).
+  seats(plan) {
+    const out = [];
+    let n = 0;
+    const add = (it, lx, ly, roles, seatH) => {
+      const p = toWorld(it, lx, ly);
+      out.push({ x: p.x, y: elevAt(plan, p.x, p.y), z: p.y, rot: -(it.rot || 0) * Math.PI / 180, role: roles[(n * 7 + (n >> 2)) % 2], n: n++, seatH });
+    };
+    for (const it of plan.items) {
+      if (it.type === 'chairs') { const roles = People.rolesFor(it.label, it.style); for (const s of chairLayout(it).seats) add(it, s.x, s.y + 0.02, roles); }
+      if (it.type === 'sofa') {
+        const k = Math.max(1, Math.round(it.w / 0.8));
+        for (let i = 0; i < k; i++) add(it, -it.w / 2 + it.w * (i + 0.5) / k, -0.05, ['vipL', 'vipP'], 0.45);
+      }
+    }
+    return out;
   }
 
   placeArrows(w, phase) {
@@ -169,6 +200,7 @@ export class View3D {
       const p = w.curve.getPointAt(w.u), d = w.curve.getTangentAt(w.u);
       w.walker.position.set(p.x, p.y - 0.03, p.z); w.walker.rotation.y = Math.atan2(-d.x, -d.z);
       w.walker.visible = this.playing && !this.pov;
+      if (this.playing) w.mixer?.update(dt);
     }
     if (this.labels) this.labels.visible = !this.pov;
     const w = this.pov && this.walkers[this.povIndex || 0];

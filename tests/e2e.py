@@ -89,6 +89,14 @@ with sync_playwright() as p:
     check(pg.evaluate('app.plan.items.length') == n + 1 and pg.evaluate('app.plan.items.at(-1).w') == 3, 'small canopy from palette')
     pg.keyboard.press('Control+z'); pg.keyboard.press('Control+z')
 
+    # people: everyone seated (722 chairs + 8 sofa seats), walkers animated
+    pg.wait_for_function('window.v3 && v3.walkers.length && v3.walkers.every(w => w.mixer)', timeout=30000)
+    seated = pg.evaluate('(() => { let n = 0; v3.root.traverse(o => { if (o.isInstancedMesh && o.material.name === "Shoes") n += o.count; }); return n; })()')
+    check(seated == 730, f'audience fills every chair + sofa seat ({seated})')
+    pg.click('[data-act=crowd]'); pg.wait_for_timeout(300)
+    check(pg.evaluate('(() => { let n = 0; v3.root.traverse(o => { if (o.isInstancedMesh && o.material.name === "Shoes") n += o.count; }); return n; })()') == 0, 'Penonton toggle hides audience')
+    pg.click('[data-act=crowd]')
+
     # 3D views
     pg.click('[data-view="3d"]'); pg.wait_for_timeout(800)
     pg.screenshot(path=f'{SHOTS}/3d.png')

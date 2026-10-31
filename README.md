@@ -21,6 +21,7 @@ Tiada internet diperlukan — Three.js disimpan dalam `vendor/`.
 | Lukis aliran | Alat **Aliran**: klik setiap titik mengikut urutan. Klik petak titik → tulis nota langkah (cth. “3. Naik tangga”) |
 | Lakaran / imbasan | **Lakaran latar → Import gambar**: letak foto lakaran tangan atau pelan, tetapkan lebar sebenar (m), surih di atasnya |
 | Lihat aliran dalam 3D | **▶ Main aliran** (orang bergerak ikut laluan) · **Pandangan berjalan** = pandangan mata penerima |
+| Orang dalam 3D | Setiap kerusi & sofa diisi penonton (murid berpakaian sekolah & bertudung, guru, ibu bapa, VIP berbaju Melayu & bersongkok) mengikut label blok. **👥 Penonton** = tunjuk / sembunyi. Aliran dimainkan oleh orang sebenar yang berjalan (animasi CC0) |
 | Simpan | Auto-simpan dalam pelayar. **Simpan** = fail `.json` (kongsi dengan guru lain) · **Gambar 2D / 3D** = PNG untuk cetak |
 
 Pintasan: `V` pilih · `W` dinding · `L` aliran · `R` putar · anak panah = alih · `Del` padam · `Ctrl+Z / Ctrl+Y` · `Ctrl+D` duplikat ·
@@ -35,4 +36,5 @@ meja pendaftaran, pintu, kawasan luar di **kiri, kanan dan belakang serentak**: 
 ## Untuk pembangun
 - Tiada build step. `js/plan.js` = model data (tulen, tanpa DOM) · `js/editor2d.js` = kanvas 2D · `js/view3d.js` = Three.js ·
   `js/models.js` = model 3D · `js/main.js` = UI.
+- Model orang: aset CC0 Quaternius, dibina dengan `art/build_people.py` (lihat `CREDITS.md`).
 - Ujian: `npm test` (model) dan `python tests/e2e.py` (pelayar, perlu pelayan di :8765; tangkapan skrin ke `tests/shots/`).
