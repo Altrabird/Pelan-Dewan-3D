@@ -250,8 +250,39 @@ function zone(it) {
   const m=new THREE.Mesh(new THREE.PlaneGeometry(it.w,it.h),mat(it.color,{transparent:true,opacity:0.16,depthWrite:false}));m.rotation.x=-Math.PI/2;m.position.y=0.012;g.add(m);
   const e=new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry),new THREE.LineBasicMaterial({color:it.color,transparent:true,opacity:0.65}));e.rotation.x=-Math.PI/2;e.position.y=0.014;g.add(e);return g;
 }
-export function build(it,wallHeight) {
+// Event canopy (khemah): white pyramid roof on posts with a coloured valance. `open` = see-through roof.
+function canopy(it, open) {
+  const g = new THREE.Group(), w = it.w, d = it.h, H = 2.5, rise = Math.min(w, d) * 0.22;
+  const nx = Math.max(1, Math.round(w / 6)), nz = Math.max(1, Math.round(d / 6)); // extra posts every ~6 m
+  for (let i = 0; i <= nx; i++) for (let j = 0; j <= nz; j++)
+    if (i === 0 || i === nx || j === 0 || j === nz) cyl(g, 0.035, 0.035, H, '#cbd5e1', -w / 2 + w * i / nx, 0, -d / 2 + d * j / nz, 8);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(Math.SQRT1_2, 1, 4, 1, true).rotateY(Math.PI / 4).scale(w, rise, d),
+    mat('#f8fafc', { side: THREE.DoubleSide, transparent: open, opacity: open ? 0.18 : 1, depthWrite: !open }));
+  roof.position.y = H + rise / 2; roof.castShadow = !open; roof.receiveShadow = true; g.add(roof);
+  for (const [x, z, lw, ld] of [[0, -d / 2, w, 0.02], [0, d / 2, w, 0.02], [-w / 2, 0, 0.02, d], [w / 2, 0, 0.02, d]])
+    box(g, lw, 0.3, ld, it.color, x, H - 0.3, z);
+  return g;
+}
+
+function tree(it) {
+  const g = new THREE.Group(), r = it.w / 2;
+  cyl(g, 0.12, 0.18, 2.2, '#6b4423', 0, 0, 0, 8);
+  const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1).scale(r, r * 0.8, it.h / 2), mat(it.color, { flatShading: true }));
+  crown.position.y = 2.2 + r * 0.6; crown.castShadow = true; g.add(crown);
+  return g;
+}
+
+function ground(it, surfaces) {
+  // overlapping areas sit at the same height: smaller ones win the depth test via polygon offset
+  const area = it.w * it.h, k = area < 60 ? 3 : area < 400 ? 2 : 1;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(it.w, it.h), mat((surfaces[it.surface] || surfaces.simen)[1], { roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -k, polygonOffsetUnits: -4 * k }));
+  m.rotation.x = -Math.PI / 2; m.position.y = 0.01; m.receiveShadow = true;
+  const g = new THREE.Group(); g.add(m); return g;
+}
+
+export function build(it,wallHeight,open=false,surfaces) {
   switch(it.type) {
+    case 'canopy':return canopy(it,open); case 'tree':return tree(it); case 'ground':return ground(it,surfaces);
     case 'stage':return stage(it); case 'steps':return steps(it); case 'sofa':return sofa(it);
     case 'table':return table(it,false); case 'round':return table(it,true); case 'rostrum':return rostrum(it);
     case 'screen':return screen(it); case 'flag':return flag(it); case 'plant':return plant(it);

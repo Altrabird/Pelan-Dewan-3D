@@ -1,4 +1,4 @@
-import { TYPES, CHAIR_STYLES, makeItem, chairLayout, isPoly, seatCounts, emptyPlan, dewanSriPekan, History, uid } from './plan.js';
+import { TYPES, CHAIR_STYLES, SURFACES, SIDES, sideArea, makeItem, chairLayout, isPoly, seatCounts, emptyPlan, dewanSriPekan, History, uid } from './plan.js';
 import { Editor2D } from './editor2d.js';
 import { View3D } from './view3d.js';
 
@@ -38,11 +38,16 @@ function setPlan(p, fit = true) {
 }
 
 // ---------- palette ----------
-const PALETTE = ['zone', 'stage', 'steps', 'chairs', 'sofa', 'table', 'round', 'rostrum', 'screen', 'flag', 'plant', 'speaker', 'camera', 'pillar', 'door', 'label'];
-$('#palette').innerHTML = PALETTE.map(t => `<button data-add="${t}"><i style="background:${TYPES[t].color}"></i>${TYPES[t].name}</button>`).join('');
+// [type, button text, preset fields]
+const PALETTE = [['zone'], ['stage'], ['steps'], ['chairs'], ['sofa'], ['table'], ['round'], ['rostrum'], ['screen'], ['flag'], ['plant'], ['speaker'], ['camera'], ['pillar'], ['door'], ['label'],
+  ['canopy', 'Kanopi Besar (6×6 m)', { w: 6, h: 6 }], ['canopy', 'Kanopi Kecil (3×3 m)', { w: 3, h: 3 }], ['ground', 'Kawasan Luar (dataran / padang)'], ['tree']];
+$('#palette').innerHTML = PALETTE.map(([t, name], i) => `${PALETTE[i - 1]?.[0] === 'label' ? '<h4>Luar dewan</h4>' : ''}<button data-add="${i}"><i style="background:${TYPES[t].color}"></i>${name || TYPES[t].name}</button>`).join('')
+  + `<h4>Kawasan luar di sisi dewan</h4><div class="sides">${Object.entries(SIDES).map(([k, n]) => `<button data-side="${k}" title="Tambah kawasan luar 15 m di ${n.toLowerCase()} dewan">${n}</button>`).join('')}</div>`;
 $('#palette').onclick = e => {
-  const t = e.target.closest('[data-add]')?.dataset.add; if (!t) return;
-  const c = ed.center(), it = makeItem(t, c.x, c.y);
+  const side = e.target.closest('[data-side]')?.dataset.side;
+  if (side) { const g = sideArea(app.plan, side); app.plan.items.push(g); app.setTool('select'); app.select(g.id); return app.commit(); }
+  const i = e.target.closest('[data-add]')?.dataset.add; if (i == null) return;
+  const [t, , preset] = PALETTE[i], c = ed.center(), it = makeItem(t, c.x, c.y, preset);
   if (t === 'zone') it.label = 'Zon baharu';
   app.plan.items.push(it); app.setTool('select'); app.select(it.id); app.commit();
 };
@@ -53,7 +58,7 @@ const F = {
   w: ['Lebar (m)', 'num'], h: ['Dalam (m)', 'num'], height: ['Tinggi (m)', 'num'], thick: ['Tebal (m)', 'num'],
   rows: ['Baris', 'int'], cols: ['Kerusi sebaris', 'int'], sx: ['Jarak kiri-kanan (m)', 'num'], sy: ['Jarak baris (m)', 'num'],
   aisleEvery: ['Lorong setiap … kerusi (0 = tiada)', 'int'], aisle: ['Lebar lorong (m)', 'num'],
-  style: ['Jenis kerusi', 'select', CHAIR_STYLES], rowStart: ['Huruf baris pertama', 'text'], closed: ['Tutup bentuk', 'check'],
+  style: ['Jenis kerusi', 'select', CHAIR_STYLES], surface: ['Permukaan', 'select', Object.fromEntries(Object.entries(SURFACES).map(([k, [n]]) => [k, n]))], rowStart: ['Huruf baris pertama', 'text'], closed: ['Tutup bentuk', 'check'],
 };
 const fieldsFor = it => ({
   wall: ['thick', 'height', 'color', 'closed'],
@@ -61,6 +66,8 @@ const fieldsFor = it => ({
   chairs: ['label', 'color', 'style', 'rows', 'cols', 'sx', 'sy', 'aisleEvery', 'aisle', 'rowStart', 'x', 'y', 'rot'],
   stage: ['label', 'color', 'height', 'x', 'y', 'w', 'h', 'rot'],
   steps: ['label', 'color', 'height', 'x', 'y', 'w', 'h', 'rot'],
+  ground: ['label', 'surface', 'x', 'y', 'w', 'h', 'rot'],
+  canopy: ['label', 'color', 'x', 'y', 'w', 'h', 'rot'],
 })[it.type] || ['label', 'color', 'x', 'y', 'w', 'h', 'rot'];
 
 function input(key, val, [lab, kind, opts]) {
@@ -88,6 +95,7 @@ function renderProps(light) {
       : `<p class="muted">Klik petak titik untuk tambah nota langkah. Dwiklik pada garisan untuk tambah titik.</p>`;
   }
   if (it.type === 'wall') html += '<p class="muted">Seret petak untuk alih sudut. Dwiklik pada dinding untuk tambah sudut.</p>';
+  if (it.type === 'canopy' || it.type === 'ground') html += `<p class="muted">Bila diseret, semua objek di atasnya (kerusi, kanopi…) ikut bergerak. Tahan Shift untuk alih ${it.type === 'canopy' ? 'kanopi' : 'kawasan'} sahaja.${it.type === 'ground' ? ' Kawasan dipilih dengan klik pada tepinya.' : ''}</p>`;
   html += `<div class="btns"><button data-act="dup">Duplikat</button><button data-act="del" class="danger">Padam</button></div>`;
   box.innerHTML = html;
 }
@@ -110,6 +118,7 @@ function renderSummary() {
   const s = seatCounts(app.plan);
   $('#summary').innerHTML = s.blocks.map(b => `<div class="sum"><i style="background:${b.color}"></i><span>${esc(b.label)}</span><b>${b.n}</b></div>`).join('')
     + (s.sofas ? `<div class="sum"><i style="background:${TYPES.sofa.color}"></i><span>Tempat duduk sofa</span><b>${s.sofas}</b></div>` : '')
+    + (s.outside ? `<div class="sum"><span>Dalam dewan</span><b>${s.inside}</b></div>` + Object.entries(s.areas).map(([k, n]) => `<div class="sum"><span>Luar · ${esc(k)}</span><b>${n}</b></div>`).join('') : '')
     + `<div class="sum total"><span>Jumlah tempat duduk</span><b>${s.total}</b></div>`;
 }
 

@@ -18,11 +18,11 @@ with sync_playwright() as p:
     pg.wait_for_timeout(1500)
     n0 = pg.evaluate('app.plan.items.length')
     check(n0 > 40, f'template loaded ({n0} items)')
-    check('298' in pg.inner_text('#summary'), 'seat total shown')
+    check('730' in pg.inner_text('#summary') and 'Kawasan Kiri' in pg.inner_text('#summary') and 'Kawasan Kanan' in pg.inner_text('#summary'), 'seat total + per-area outside subtotals')
     pg.screenshot(path=f'{SHOTS}/split.png')
 
     # add a chair block from the palette, then nudge and edit it
-    pg.click('[data-add=chairs]')
+    pg.click('#palette >> text=Blok Kerusi')
     it = pg.evaluate('app.plan.items.at(-1)')
     check(it['type'] == 'chairs' and pg.evaluate('app.sel') == it['id'], 'palette adds + selects chair block')
     x0 = it['x']
@@ -62,6 +62,32 @@ with sync_playwright() as p:
     check(rot % 15 == 0 and rot != 0, f'rotate handle snaps to 15° ({rot})')
     pg.keyboard.press('Control+z'); pg.keyboard.press('Control+z')
     check(pg.evaluate(f'app.plan.items.find(i => i.id == "{sofa["id"]}").x') == sofa['x'], 'undo drag')
+
+    # drag the outdoor area by its left edge 5 m right: canopies and their chairs come along; Shift-drag a canopy moves it alone
+    gr = pg.evaluate('app.plan.items.find(i => i.type == "ground")')
+    ids = pg.evaluate(f'ed.contents(app.plan.items.find(i => i.id == "{gr["id"]}")).map(k => k.it.id)')
+    other = pg.evaluate('app.plan.items.filter(i => i.label == "Murid Kanopi 5").map(i => i.x)')
+    kids0 = pg.evaluate(f'app.plan.items.filter(i => {ids}.includes(i.id) && (i.type == "canopy" || i.type == "chairs")).map(i => i.x)')
+    x, y = pg.evaluate(f'({S})({{x:{gr["x"] - gr["w"] / 2}, y:25}})')
+    pg.mouse.move(x, y); pg.mouse.down(); pg.mouse.move(x + 5 * k, y, steps=8); pg.mouse.up()
+    kids1 = pg.evaluate(f'app.plan.items.filter(i => {ids}.includes(i.id) && (i.type == "canopy" || i.type == "chairs")).map(i => i.x)')
+    check(pg.evaluate('app.plan.items.filter(i => i.label == "Murid Kanopi 5").map(i => i.x)') == other, 'other side area untouched')
+    check(pg.evaluate('app.sel') == gr['id'] and all(abs(b - a - 5) < 0.11 for a, b in zip(kids0, kids1)) and len(kids0) == 8, 'dragging the area carries canopies + chairs')
+    pg.keyboard.press('Control+z')
+    can = pg.evaluate('app.plan.items.find(i => i.type == "canopy")')
+    chairs0 = pg.evaluate('app.plan.items.find(i => i.label == "Murid Kanopi 1").x')
+    x, y = pg.evaluate(f'({S})({{x:{can["x"] + 2.93}, y:{can["y"]}}})')
+    pg.keyboard.down('Shift'); pg.mouse.move(x, y); pg.mouse.down(); pg.mouse.move(x + 2 * k, y, steps=6); pg.mouse.up(); pg.keyboard.up('Shift')
+    check(pg.evaluate('app.sel') == can['id'] and abs(pg.evaluate(f'app.plan.items.find(i => i.id == "{can["id"]}").x') - can['x'] - 2) < 0.11
+          and pg.evaluate('app.plan.items.find(i => i.label == "Murid Kanopi 1").x') == chairs0, 'shift-drag moves canopy alone')
+    pg.keyboard.press('Control+z')
+    n = pg.evaluate('app.plan.items.length'); pg.click('[data-side=depan]')
+    g = pg.evaluate('app.plan.items.at(-1)')
+    check(pg.evaluate('app.plan.items.length') == n + 1 and g['type'] == 'ground' and g['label'] == 'Kawasan Depan' and abs(g['y'] + g['h'] / 2 + 1) < 1e-6, 'one-click front area added')
+    pg.keyboard.press('Control+z')
+    n = pg.evaluate('app.plan.items.length'); pg.click('#palette >> text=Kanopi Kecil (3×3 m)')
+    check(pg.evaluate('app.plan.items.length') == n + 1 and pg.evaluate('app.plan.items.at(-1).w') == 3, 'small canopy from palette')
+    pg.keyboard.press('Control+z'); pg.keyboard.press('Control+z')
 
     # 3D views
     pg.click('[data-view="3d"]'); pg.wait_for_timeout(800)

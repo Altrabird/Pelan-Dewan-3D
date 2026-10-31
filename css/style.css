@@ -111,3 +111,7 @@ input[type=range], input[type=checkbox] { accent-color: var(--accent); }
   .palette { gap: 2px; } .palette button { padding-top: 3px; padding-bottom: 3px; }
   .tools button { padding-top: 5px; padding-bottom: 5px; }
 }
+
+.palette h4 { margin: 8px 0 2px; font-size: 11px; color: var(--muted); font-weight: 600; }
+.palette .sides { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; }
+.palette .sides button { justify-content: center; }

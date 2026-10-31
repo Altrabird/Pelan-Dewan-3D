@@ -1,5 +1,7 @@
 // 2D plan editor on a <canvas>. Reads/writes app.plan; calls app.commit() after each finished edit.
-import { chairLayout, rowName, toWorld, toLocal, inRect, distToSeg, polySegs, isPoly, layerOf, bounds, makeItem } from './plan.js';
+import { chairLayout, rowName, toWorld, toLocal, inRect, distToSeg, polySegs, isPoly, layerOf, bounds, makeItem, SURFACES } from './plan.js';
+
+const CARRIES = ['canopy', 'ground']; // dragging these also moves what stands on them
 
 const HANDLE = 7; // px
 
@@ -57,11 +59,14 @@ export class Editor2D {
     return this.handles(this.sel()).find(h => Math.hypot(h.x - p.x, h.y - p.y) <= r);
   }
   hitItem(p) {
-    const tol = 5 / this.scale;
     const list = [...this.plan.items].sort((a, b) => layerOf(b) - layerOf(a));
-    return list.find(it => !it.locked && (isPoly(it)
+    // exact hits first, so the thin canopy strip around a chair block is not swallowed by the click tolerance
+    const find = tol => list.find(it => !it.locked && (isPoly(it)
       ? polySegs(it).some(([a, b]) => distToSeg(p, a, b) <= Math.max(tol, (it.thick || 0.15) / 2 + tol))
+      // big outdoor areas are picked by their edge only, so clicking inside still pans / selects what is on them
+      : it.type === 'ground' ? inRect(it, p.x, p.y, 5 / this.scale) && !inRect(it, p.x, p.y, -8 / this.scale)
       : inRect(it, p.x, p.y, tol)));
+    return find(0) || find(5 / this.scale);
   }
 
   // ---------- pointer ----------
@@ -93,7 +98,8 @@ export class Editor2D {
     }
     const hit = this.hitItem(p);
     this.app.select(hit?.id ?? null);
-    this.drag = hit ? { kind: 'move', p0: p, start: JSON.parse(JSON.stringify(hit)) } : { kind: 'pan', sx: e.clientX, sy: e.clientY, ox: this.ox, oy: this.oy };
+    this.drag = hit ? { kind: 'move', p0: p, start: JSON.parse(JSON.stringify(hit)), kids: CARRIES.includes(hit.type) && !e.shiftKey ? this.contents(hit) : [] }
+      : { kind: 'pan', sx: e.clientX, sy: e.clientY, ox: this.ox, oy: this.oy };
   }
 
   move(e) {
@@ -108,7 +114,10 @@ export class Editor2D {
         // snap the first point and carry the rest with it
         const s0 = d.start.pts[0], q = this.snapP({ x: s0.x + dx, y: s0.y + dy }, e);
         it.pts.forEach((pt, i) => { pt.x = +(d.start.pts[i].x + q.x - s0.x).toFixed(3); pt.y = +(d.start.pts[i].y + q.y - s0.y).toFixed(3); });
-      } else { it.x = this.snap(d.start.x + dx, e); it.y = this.snap(d.start.y + dy, e); }
+      } else {
+        it.x = this.snap(d.start.x + dx, e); it.y = this.snap(d.start.y + dy, e);
+        for (const k of d.kids) { k.it.x = +(k.x + it.x - d.start.x).toFixed(3); k.it.y = +(k.y + it.y - d.start.y).toFixed(3); }
+      }
       d.moved = true;
     }
     else if (d.kind === 'pt') { Object.assign(it.pts[d.i], this.snapP(p, e)); d.moved = true; }
@@ -129,6 +138,12 @@ export class Editor2D {
     }
     if (d.kind !== 'pan') this.app.refresh(true);
     this.draw();
+  }
+
+  // Items whose centre is on top of `it` (and are smaller than it), with their start positions.
+  contents(it) {
+    return this.plan.items.filter(k => k !== it && !isPoly(k) && layerOf(k) >= layerOf(it) && k.w * k.h < it.w * it.h && inRect(it, k.x, k.y))
+      .map(k => ({ it: k, x: k.x, y: k.y }));
   }
 
   up() {
@@ -223,6 +238,24 @@ export class Editor2D {
     const rect = (fill, stroke = '#334155') => { c.fillStyle = fill; c.fillRect(-w / 2, -h / 2, w, h); c.strokeStyle = stroke; c.strokeRect(-w / 2, -h / 2, w, h); };
     let label = it.label, ly = 0;
     switch (it.type) {
+      case 'ground':
+        c.fillStyle = (SURFACES[it.surface] || SURFACES.simen)[1]; c.fillRect(-w / 2, -h / 2, w, h);
+        c.strokeStyle = '#00000033'; c.lineWidth = 2 * lw; c.strokeRect(-w / 2, -h / 2, w, h);
+        label = ''; c.restore();
+        { const p = toWorld(it, 0, -h / 2 + 0.6); this.text(c, it.label, p.x, p.y, fs, '#334155'); }
+        return;
+      case 'canopy': {
+        c.fillStyle = '#ffffff55'; c.fillRect(-w / 2, -h / 2, w, h);
+        c.strokeStyle = '#94a3b8'; c.lineWidth = lw; c.beginPath(); c.moveTo(-w / 2, -h / 2); c.lineTo(w / 2, h / 2); c.moveTo(w / 2, -h / 2); c.lineTo(-w / 2, h / 2); c.stroke();
+        c.strokeStyle = col; c.lineWidth = 3 * lw; c.strokeRect(-w / 2, -h / 2, w, h);
+        c.fillStyle = '#334155'; for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) c.fillRect(a * w / 2 - 0.08, b * h / 2 - 0.08, 0.16, 0.16);
+        label = `${it.label || 'Kanopi'} (${+it.w.toFixed(1)}×${+it.h.toFixed(1)} m)`; ly = h / 2 + 0.45;
+        break;
+      }
+      case 'tree':
+        c.beginPath(); c.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2); c.fillStyle = col + '88'; c.fill(); c.strokeStyle = col; c.lineWidth = 2 * lw; c.stroke();
+        c.fillStyle = '#78350f'; c.beginPath(); c.arc(0, 0, 0.18, 0, Math.PI * 2); c.fill();
+        break;
       case 'zone':
         c.fillStyle = col + '2e'; c.fillRect(-w / 2, -h / 2, w, h);
         c.setLineDash([6 * lw, 4 * lw]); c.strokeStyle = col; c.lineWidth = 2 * lw; c.strokeRect(-w / 2, -h / 2, w, h); c.setLineDash([]);

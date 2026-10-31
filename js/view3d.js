@@ -1,7 +1,7 @@
 // Three.js view built from the plan. Plan (x, y) → world (x, z); item rot (clockwise, degrees) → rotation.y = -rot.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { chairLayout, elevAt, polySegs, bounds } from './plan.js';
+import { chairLayout, elevAt, polySegs, bounds, SURFACES } from './plan.js';
 import * as M from './models.js';
 
 
@@ -39,7 +39,7 @@ export class View3D {
     r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.12;
     host.appendChild(r.domElement);
     this.scene = new THREE.Scene(); this.scene.background = new THREE.Color('#e8e5de');
-    this.camera = new THREE.PerspectiveCamera(50, 1, 0.05, 500);
+    this.camera = new THREE.PerspectiveCamera(50, 1, 0.15, 600);
     this.controls = new OrbitControls(this.camera, r.domElement);
     this.controls.enableDamping = true; this.controls.maxPolarAngle = Math.PI * 0.495;
     this.scene.add(new THREE.HemisphereLight('#f1f6ff', '#9a8060', 2.0));
@@ -68,8 +68,13 @@ export class View3D {
     const b = bounds(plan), cx = (b.x0 + b.x1) / 2, cz = (b.y0 + b.y1) / 2, W = b.x1 - b.x0, D = b.y1 - b.y0;
     const wallH = this.lowWalls ? 1.2 : Math.max(3, ...plan.items.filter(i => i.type === 'wall').map(i => i.height));
 
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(W + 6, D + 6), hallFloor(W + 6, D + 6));
-    floor.rotation.x = -Math.PI / 2; floor.position.set(cx, 0, cz); floor.receiveShadow = true; this.root.add(floor);
+    // outside ground everywhere, timber floor only inside closed walls
+    const outside = new THREE.Mesh(new THREE.PlaneGeometry(W + 20, D + 20), M.mat('#a9b59a', { roughness: 0.95 }));
+    outside.rotation.x = -Math.PI / 2; outside.position.set(cx, 0, cz); outside.receiveShadow = true; this.root.add(outside);
+    for (const w of plan.items.filter(i => i.type === 'wall' && i.closed && i.pts.length > 2)) {
+      const floor = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape(w.pts.map(p => new THREE.Vector2(p.x, -p.y)))), hallFloor(1, 1));
+      floor.rotation.x = -Math.PI / 2; floor.position.y = 0.008; floor.receiveShadow = true; this.root.add(floor);
+    }
 
     const s = this.sun, R = Math.max(W, D);
     s.position.set(cx + R * 0.4, R * 1.2, cz + R * 0.6); s.target.position.set(cx, 0, cz);
@@ -81,11 +86,11 @@ export class View3D {
       const y = it.type === 'stage' || it.type === 'steps' ? 0 : elevAt(plan, it.x, it.y);
       const place = o => { o.position.set(it.x, y, it.y); o.rotation.y = -(it.rot || 0) * Math.PI / 180; this.root.add(o); return o; };
       if (it.type === 'chairs') this.chairs(it, place);
-      else { const o = M.build(it, wallH); if (o) place(o); }
+      else { const o = M.build(it, wallH, this.lowWalls, SURFACES); if (o) place(o); }
       const text = it.type === 'chairs' ? `${it.label || 'Kerusi'} (${it.rows * it.cols})` : it.label;
       if (text) {
         const sp = M.labelSprite(text, it.type === 'label' ? it.color : '#0f172a');
-        sp.position.set(it.x, y + (it.type === 'zone' || it.type === 'label' ? 0.6 : it.type === 'stage' ? it.height + 0.4 : 2.3), it.y);
+        sp.position.set(it.x, y + ({ zone: 0.6, label: 0.6, ground: 0.6, canopy: 4.2, tree: 4.5 }[it.type] ?? (it.type === 'stage' ? it.height + 0.4 : 2.3)), it.y);
         this.labels.add(sp);
       }
     }
