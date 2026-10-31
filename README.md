@@ -4,7 +4,9 @@ Lakar pelan 2D dewan dan lihat terus dalam 3D (Three.js). Dibina untuk merancang
 susunan kerusi, kawasan VIP, zon penting dan aliran pergerakan penerima anugerah.
 
 ## Cara buka
-Dwiklik **`Mula.bat`**. Ia memulakan pelayan tempatan (perlu Python) dan membuka `http://localhost:8765/`.
+**Dalam talian:** https://altrabird.github.io/Pelan-Dewan-3D/ (pelan disimpan dalam pelayar setiap pengguna; kongsi pelan dengan butang **Simpan** → fail `.json`).
+
+**Luar talian:** dwiklik **`Mula.bat`**. Ia memulakan pelayan tempatan (perlu Python) dan membuka `http://localhost:8765/`.
 Tiada internet diperlukan — Three.js disimpan dalam `vendor/`.
 
 ## Cara guna
