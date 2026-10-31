@@ -1,0 +1,6 @@
+{
+  "name": "pelan-dewan-3d",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node tests/selftest.mjs" }
+}

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ms">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pelan Dewan 3D</title>
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/" } }
+</script>
+</head>
+<body>
+<header class="top">
+  <div class="brand">Pelan Dewan <b>3D</b></div>
+  <input id="planName" class="plan-name" aria-label="Nama pelan">
+  <div class="group">
+    <button data-act="new" title="Pelan kosong baharu">Baharu</button>
+    <button data-act="template" title="Muat semula templat Dewan Sri Pekan">Templat Dewan Sri Pekan</button>
+    <button data-act="open" title="Buka fail .json">Buka</button>
+    <button data-act="save" title="Simpan sebagai fail .json">Simpan</button>
+    <button data-act="png2d" title="Muat turun gambar pelan 2D">Gambar 2D</button>
+    <button data-act="png3d" title="Muat turun gambar 3D">Gambar 3D</button>
+  </div>
+  <div class="group">
+    <button data-act="undo" title="Buat asal (Ctrl+Z)">↶</button>
+    <button data-act="redo" title="Buat semula (Ctrl+Y)">↷</button>
+  </div>
+  <div class="group seg" id="viewMode">
+    <button data-view="2d">2D</button><button data-view="split" class="on">2D + 3D</button><button data-view="3d">3D</button>
+  </div>
+  <input type="file" id="fileOpen" accept=".json,application/json" hidden>
+  <input type="file" id="fileImg" accept="image/*" hidden>
+</header>
+
+<aside class="left">
+  <h3>Alat</h3>
+  <div class="tools">
+    <button data-tool="select" class="on" title="Pilih, alih, ubah saiz (V)">⬚ Pilih</button>
+    <button data-tool="wall" title="Lukis dinding: klik setiap sudut, dwiklik untuk tamat (W)">▭ Dinding</button>
+    <button data-tool="path" title="Lukis aliran pergerakan: klik setiap titik, dwiklik untuk tamat (L)">➜ Aliran</button>
+  </div>
+  <h3>Tambah</h3>
+  <div class="palette" id="palette"></div>
+  <h3>Grid</h3>
+  <label class="row">Lekap <select id="snap"><option value="0">Tiada</option><option value="0.05">5 cm</option><option value="0.1" selected>10 cm</option><option value="0.25">25 cm</option><option value="0.5">50 cm</option><option value="1">1 m</option></select></label>
+  <button data-act="fit" class="wide">Muatkan pelan ke skrin</button>
+</aside>
+
+<main id="stage" class="split">
+  <section id="pane2d"><canvas id="cv"></canvas><div class="hint" id="hint"></div></section>
+  <section id="pane3d">
+    <div class="bar3d">
+      <button data-act="play">▶ Main aliran</button>
+      <select id="povPath" title="Pilih aliran untuk pandangan mata"></select>
+      <button data-act="pov">👁 Pandangan berjalan</button>
+      <button data-act="walls">Dinding rendah</button>
+      <button data-act="frame">Pusat kamera</button>
+    </div>
+  </section>
+</main>
+
+<aside class="right">
+  <section><h3>Sifat</h3><div id="props" class="props"></div></section>
+  <section><h3>Ringkasan tempat duduk</h3><div id="summary"></div></section>
+  <section>
+    <h3>Lakaran latar</h3>
+    <p class="muted">Import gambar / imbasan lakaran pelan dan surih di atasnya.</p>
+    <div id="underlay" class="props"></div>
+  </section>
+</aside>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
