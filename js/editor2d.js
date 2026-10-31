@@ -220,10 +220,12 @@ export class Editor2D {
     c.globalAlpha = 1;
   }
 
-  text(c, str, x, y, size, color = '#0f172a', bold = true) {
+  text(c, str, x, y, size, color = '#0f172a', bold = true, rot = 0) {
     if (!str) return;
     const px = 1 / this.scale;
-    c.save(); c.translate(x, y); c.scale(px, px);
+    rot = ((rot % 360) + 540) % 360 - 180; // follow the item but never read upside down
+    if (rot > 90) rot -= 180; else if (rot < -90) rot += 180;
+    c.save(); c.translate(x, y); c.rotate(rot * Math.PI / 180); c.scale(px, px);
     c.font = `${bold ? 600 : 400} ${size}px system-ui, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
     c.lineWidth = 3; c.strokeStyle = 'rgba(255,255,255,.85)'; c.strokeText(str, 0, 0);
     c.fillStyle = color; c.fillText(str, 0, 0); c.restore();
@@ -242,7 +244,7 @@ export class Editor2D {
         c.fillStyle = (SURFACES[it.surface] || SURFACES.simen)[1]; c.fillRect(-w / 2, -h / 2, w, h);
         c.strokeStyle = '#00000033'; c.lineWidth = 2 * lw; c.strokeRect(-w / 2, -h / 2, w, h);
         label = ''; c.restore();
-        { const p = toWorld(it, 0, -h / 2 + 0.6); this.text(c, it.label, p.x, p.y, fs, '#334155'); }
+        { const p = toWorld(it, 0, -h / 2 + 0.6); this.text(c, it.label, p.x, p.y, fs, '#334155', true, it.rot || 0); }
         return;
       case 'canopy': {
         c.fillStyle = '#ffffff55'; c.fillRect(-w / 2, -h / 2, w, h);
@@ -308,7 +310,7 @@ export class Editor2D {
         label = it.label;
     }
     c.restore();
-    if (label) { const p = toWorld(it, 0, ly); this.text(c, label, p.x, p.y, fs); }
+    if (label) { const p = toWorld(it, 0, ly); this.text(c, label, p.x, p.y, fs, undefined, true, it.rot || 0); }
   }
 
   drawWall(c, it) {
